@@ -13,7 +13,9 @@ defmodule LiveReact.SSR do
   @type props :: %{optional(String.t() | atom) => any}
 
   @type render_response :: %{
-          required(String.t()) => String.t()
+          "html" => String.t(),
+          "head" => String.t(),
+          "css" => %{"code" => String.t(), "map" => String.t()}
         }
 
   @callback render(component_name, props) :: render_response | no_return
@@ -22,6 +24,11 @@ defmodule LiveReact.SSR do
   def render(name, props) do
     mod = Application.get_env(:live_react, :ssr_module, LiveReact.SSR.NodeJS)
 
-    mod.render(name, props)
+    case mod.render(name, props) do
+      %{"html" => html, "head" => head, "css" => css} = response ->
+        response
+      _ ->
+        raise "Invalid SSR response format"
+    end
   end
 end
