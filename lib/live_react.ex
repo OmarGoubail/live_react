@@ -1,27 +1,28 @@
 defmodule LiveReact do
+  use Phoenix.Component
+  import Phoenix.HTML
+
   @moduledoc """
   See READ.md for installation instructions and examples.
   """
-
-  use Phoenix.Component
 
   @doc """
   Render a React component.
   """
   def react(assigns) do
-    # we manually compute __changed__ for the computed props and slots so it's not sent without reason
     {props, props_changed?} = extract(assigns, :props)
+    ssr_render = if assigns[:ssr] != false, do: LiveReact.SSR.render(assigns.name, props), else: nil
 
     assigns =
       assigns
       |> Map.put_new(:class, nil)
       |> Map.put(:__component_name, Map.get(assigns, :name))
       |> Map.put(:props, props)
+      |> Map.put(:ssr_render, ssr_render)
 
-    computed_changed =
-      %{
-        props: props_changed?
-      }
+    computed_changed = %{
+      props: props_changed?
+    }
 
     assigns =
       update_in(assigns.__changed__, fn
@@ -34,10 +35,14 @@ defmodule LiveReact do
       id={assigns[:id] || id(@__component_name)}
       data-name={@__component_name}
       data-props={"#{json(@props)}"}
+      data-ssr={@ssr_render != nil}
       phx-update="ignore"
       phx-hook="ReactHook"
       class={@class}
     >
+      <%= if @ssr_render do %>
+        <%= raw(@ssr_render["html"]) %>
+      <% end %>
     </div>
     """
   end
@@ -60,7 +65,9 @@ defmodule LiveReact do
   defp key_changed(%{__changed__: nil}, _key), do: true
   defp key_changed(%{__changed__: changed}, key), do: changed[key] != nil
 
-  defp json(data), do: Jason.encode!(data, escape: :html_safe)
+  defp json(props) do
+    Jason.encode!(props)
+  end
 
   defp id(name), do: "#{name}-#{System.unique_integer([:positive])}"
 end
